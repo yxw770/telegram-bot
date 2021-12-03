@@ -37,8 +37,14 @@ interface TgOPStepContract
      * @param int $tg_userid            telegram的用户id
      * @param int $type                 步骤类型
      * @param int $bot_id               机器人id
-     * @param int $add_expired_time     添加过期时间，秒
+     * @param int $expired_time         过期时间多久过期，秒,为0则不变
      * @return mixed
      */
-    public function isExist(int $tg_userid, int $type, int $bot_id, int $add_expired_time = 0): bool;
+    public function isExist(int $tg_userid, int $type, int $bot_id, int $expired_time = 0): array;
+
+    /**
+     * 设置步数
+     * @return mixed
+     */
+    public function setStep();
 }

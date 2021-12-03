@@ -8,6 +8,7 @@ use App\Models\TgBot;
 use App\Utils\HandleMsg;
 use GuzzleHttp\Psr7\Response;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\TgGetMsg;
 use Telegram\Bot\Api;
@@ -25,7 +26,7 @@ class IndexController extends Controller
      */
     public function notify($type, $token, Request $request)
     {
-
+//        dd(sysconf("email_error_limit"));
         record_file_log('notify/' . date("Y-m-d") . '/' . date("H") . '-log', "【" . date('Y-m-d H:i:s') . "】\r\n" . file_get_contents("php://input") . "\r\n\r\n");
         $params = $request->input();
 
@@ -50,6 +51,8 @@ class IndexController extends Controller
      */
     protected function telegram($token, $params)
     {
+
+
         $data = [];
 
         $condition = [
@@ -63,10 +66,8 @@ class IndexController extends Controller
         if (empty($bot)) {
             return false;
         }
-
-
-
-
+//dd(is_email($params['message']['text']));
+//        return false;
         $bot_id = $bot['id'];
         $params['bot_id'] = $bot_id;;
         record_file_log('telegram/' . date("Y-m-d") . "/bot-$bot_id/notify-" . date("H") . '-log', json_encode($params));
@@ -82,18 +83,32 @@ class IndexController extends Controller
         ];
 
         try {
+            DB::beginTransaction();
             $tgGetMsg = TgGetMsg::create($data);
             $tgGetMsg->save();
+
             $params1 = [
                 'type' => "telegram",
                 'tg_userid' => $data['tg_userid'],
                 'send_at' => $data['send_at'],
                 'message_id' => $data['message_id'],
+
                 'token' => $bot['token'],
-                'bot_id' => $bot_id
+                'bot_id' => $bot_id,
+                'msg_id'=>$tgGetMsg->id,
+                'username'=>$params['message']['from']['username'],
+                'first_name'=>$params['message']['from']['first_name'],
+                'last_name'=>$params['message']['from']['last_name'],
             ];
-            return HandleMsg::handleMsg(base64_decode($data['msg']), $params1);
+            $res = HandleMsg::handleMsg(base64_decode($data['msg']), $params1);
+            if (!$res){
+                DB::rollBack();
+                return $res;
+            }
+            DB::commit();
+            return $res;
         } catch (\Exception $e) {
+            DB::rollBack();
             return json_encode([
                 'msg' => $e->getMessage(),
                 'data' => $e->getTrace()

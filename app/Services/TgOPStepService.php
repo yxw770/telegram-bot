@@ -13,6 +13,7 @@ namespace App\Services;
 
 use App\Contracts\TgOPStepContract;
 use App\Models\TgMsgStep;
+use Illuminate\Database\Eloquent\Model;
 
 class TgOPStepService implements TgOPStepContract
 {
@@ -34,7 +35,7 @@ class TgOPStepService implements TgOPStepContract
 
         $tgMsgStep = new TgMsgStep;
         $tgMsgStep->tg_userid = $tg_userid;
-        $tgMsgStep->get_msg_id = get_msg_id;
+        $tgMsgStep->get_msg_id = $get_msg_id;
         $tgMsgStep->type = $type;
         $tgMsgStep->step = $step;
         $tgMsgStep->create_at = time();
@@ -44,17 +45,47 @@ class TgOPStepService implements TgOPStepContract
         return $tgMsgStep->save();
 
     }
+
     /**
      * 是否存在
      *
-     * @param int $tg_userid            telegram的用户id
-     * @param int $type                 步骤类型
-     * @param int $bot_id               机器人id
-     * @param int $add_expired_time     添加过期时间，秒
+     * @param int $tg_userid telegram的用户id
+     * @param int $type 步骤类型
+     * @param int $bot_id 机器人id
+     * @param int $expired_time 过期时间多久过期，秒,为0则不变
      * @return mixed
      */
-    public function isExist(int $tg_userid, int $type, int $bot_id, int $add_expired_time = 0): bool
+    public function isExist(int $tg_userid, int $type, int $bot_id, int $expired_time = 0):array
     {
         // TODO: Implement isExist() method.
+        $condition = [
+            ['tg_userid', '=', $tg_userid],
+            ['bot_id', '=', $bot_id],
+            ['is_del', '=', 0],
+            ['expired_at', '>=', time()]
+        ];
+        if ($type!=0){
+            array_push($condition,['type','=',$type]);
+        }
+        $tgMsgStep = TgMsgStep::where($condition)->orderByDesc("id")->first();
+        if (empty($tgMsgStep)) {
+            return $this->ret(0);
+        } else {
+            if ($expired_time > 0) {
+                $tgMsgStep->expired_at = time() + $expired_time;
+                $tgMsgStep->save();
+            }
+            return $this->ret(1,'ok',$tgMsgStep);
+
+        }
+    }
+
+    protected function ret($status,$msg='',$data=[])
+    {
+        return [
+            'status'=>$status,
+            'msg'=>$msg,
+            'data'=>$data
+        ];
     }
 }
