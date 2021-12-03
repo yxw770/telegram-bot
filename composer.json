@@ -28,6 +28,9 @@
         },
         "files": [
             "app/common.php"
+        ],
+        "classmap": [
+            "app/Utils/TgBot"
         ]
     },
     "autoload-dev": {

@@ -8,11 +8,11 @@
  */
 
 
-
 /**
  * 记录文件日志
  */
-function record_file_log($filename, $content) {
+function record_file_log($filename, $content)
+{
     $log_path = storage_path("logs/") . $filename . '.log';
     $log_path = dirname($log_path);//父目录
     if (!is_dir($log_path)) {
@@ -43,4 +43,47 @@ function makedir($path)
         mkdir($parentdir, 0777);//从父目录往下创建
     }
 
+}
+
+
+/**
+ * @param string $dateTime 时间，如：2020-04-22 10:10:10
+ * @param string $fromZone 时间属于哪个时区
+ * @param string $toZone 时间转换为哪个时区的时间
+ * @param string $format 时间格式，如：Y-m-d H:i:s
+ * 时区选择参考：https://www.php.net/manual/zh/timezones.php 常见的如：UTC,Asia/Shanghai
+ * 时间格式参考：https://www.php.net/manual/zh/datetime.formats.php
+ *
+ * @return string
+ */
+function dateTimeChangeByZone($dateTime, $fromZone, $toZone, $format = 'Y-m-d H:i:s')
+{
+    $dateTimeZoneFrom = new DateTimeZone($fromZone);
+    $dateTimeZoneTo = new DateTimeZone($toZone);
+    $dateTimeObj = DateTime::createFromFormat($format, $dateTime, $dateTimeZoneFrom);
+    $dateTimeObj->setTimezone($dateTimeZoneTo);
+    return $dateTimeObj->format($format);
+}
+
+
+/**
+ * 返回接口数据
+ *
+ * @param int $code 状态码
+ * @param string $msg 返回信息
+ * @param array $data 数据
+ * @param string $url 回访地址
+ *
+ * @return string json数据
+ */
+function J($code, $msg = '', $data = [], $url = null)
+{
+    $return = [
+        'code' => $code,
+        'msg' => $msg,
+        'data' => $data,
+        'url' => $url,
+        'timestamp' => time(),
+    ];
+    return response()->json($return)->setEncodingOptions(JSON_UNESCAPED_UNICODE);
 }
