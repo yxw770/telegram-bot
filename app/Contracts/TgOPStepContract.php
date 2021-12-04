@@ -43,8 +43,13 @@ interface TgOPStepContract
     public function isExist(int $tg_userid, int $type, int $bot_id, int $expired_time = 0): array;
 
     /**
-     * 设置步数
-     * @return mixed
+     * 更改步数
+     * @param int $tg_userid
+     * @param int $type
+     * @param int $bot_id
+     * @param int|float $expired_at
+     * @param int $step
+     * @return bool
      */
-    public function setStep();
+    public function setStep(int $tg_userid, int $type, int $bot_id, int $expired_at = 5 * 60, int $step = 0):array;
 }

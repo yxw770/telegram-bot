@@ -15,7 +15,7 @@ use App\Contracts\TgOPStepContract;
 use App\Models\TgMsgStep;
 use Illuminate\Database\Eloquent\Model;
 
-class TgOPStepService implements TgOPStepContract
+class TgOPStepService extends BaseService implements TgOPStepContract
 {
     /**
      * 新增步骤
@@ -55,7 +55,7 @@ class TgOPStepService implements TgOPStepContract
      * @param int $expired_time 过期时间多久过期，秒,为0则不变
      * @return mixed
      */
-    public function isExist(int $tg_userid, int $type, int $bot_id, int $expired_time = 0):array
+    public function isExist(int $tg_userid, int $type, int $bot_id, int $expired_time = 0): array
     {
         // TODO: Implement isExist() method.
         $condition = [
@@ -64,8 +64,8 @@ class TgOPStepService implements TgOPStepContract
             ['is_del', '=', 0],
             ['expired_at', '>=', time()]
         ];
-        if ($type!=0){
-            array_push($condition,['type','=',$type]);
+        if ($type != 0) {
+            array_push($condition, ['type', '=', $type]);
         }
         $tgMsgStep = TgMsgStep::where($condition)->orderByDesc("id")->first();
         if (empty($tgMsgStep)) {
@@ -75,17 +75,48 @@ class TgOPStepService implements TgOPStepContract
                 $tgMsgStep->expired_at = time() + $expired_time;
                 $tgMsgStep->save();
             }
-            return $this->ret(1,'ok',$tgMsgStep);
+            return $this->ret(1, 'ok', $tgMsgStep);
 
         }
     }
 
-    protected function ret($status,$msg='',$data=[])
+    /**
+     * 更改步骤步数
+     *
+     * @param int $tg_userid telegram上的用户id
+     * @param int $type 步骤类型
+     * @param int $bot_id 机器人id
+     * @param int|float $expired_at 过期时间多久过期，秒,为0则不变
+     * @param int $step 步骤
+     * @return bool
+     */
+    public function setStep(int $tg_userid, int $type, int $bot_id, int $expired_at = 5 * 60, int $step = 0): array
     {
-        return [
-            'status'=>$status,
-            'msg'=>$msg,
-            'data'=>$data
+        // TODO: Implement setStep() method.
+        $condition = [
+            ['tg_userid', '=', $tg_userid],
+            ['bot_id', '=', $bot_id],
+            ['is_del', '=', 0],
+            ['expired_at', '>=', time()],
+            ['type', '=', $type]
         ];
+        $tgMsgStep = TgMsgStep::where($condition)->orderByDesc("id")->first();
+        if (empty($tgMsgStep)) {
+            return $this->ret(0);
+        } else {
+            if ($expired_at > 0) {
+                $tgMsgStep->expired_at = time() + $expired_at;
+
+            }
+            $tgMsgStep->step = $step;
+            $tgMsgStep->save();
+            return $this->ret(1, 'ok', $tgMsgStep);
+
+        }
     }
+
+
+
+
+
 }

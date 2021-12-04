@@ -20,7 +20,7 @@ use Illuminate\Support\Facades\Mail;
 class Email
 {
     protected $error;
-    protected $expire_in = 300;
+    protected $expire_in = 5 * 60;
 
     /**
      * 获取错误信息
@@ -53,10 +53,10 @@ class Email
         ];
         $email_code = EmailCode::where($where)->first();
         if (!empty($email_code)) {
-            $this->error = '您的操作太频繁，请稍后再试！';
+            $this->error = '您的操作太频繁，请稍后再试！再次发送时间还剩：' . ((int)($email_code->create_at) + (int)($this->expire_in) - time()) . "秒";
             return false;
         }
-        if (!$this->emailCheckError($email)){
+        if (!$this->emailCheckError($email)) {
             return false;
         }
         // 生成验证码
@@ -68,7 +68,7 @@ class Email
             'zhTime' => date("Y-m-d H:i:s", $time + 5 * 60),
             'enTime' => dateTimeChangeByZone(date("m/d/Y H:i:s", $time + 5 * 60), 'Asia/Shanghai', 'UTC', 'm/d/Y H:i:s')
         ];
-        Mail::send('mail.regcode' , $data, function ($message) use ($screen, $email) {
+        Mail::send('mail.'.$screen, $data, function ($message) use ($screen, $email) {
             switch ($screen) {
                 case 'regcode':
                     $subject = "注册验证码-Register verification Code";
@@ -104,34 +104,36 @@ class Email
      * @param string $email 邮件
      * @param string $code 验证码
      * @param string $screen 验证场景（可选）
-     * @param int    $userid  用户id
+     * @param int $userid 用户id
      * @return boolean        验证情况
      */
-    public function verifyCode($email, $code, $screen = '',$userid)
+    public function verifyCode($email, $code, $screen = '', $userid)
     {
-        if (!$this->emailCheckError($email)){
+        if (!$this->emailCheckError($email)) {
             return false;
         }
         // 检测是否存在验证码（5分钟）
         $expire_time = $_SERVER['REQUEST_TIME'] - $this->expire_in;
-        $where=[
-            ['email','=',$email],
-            ['code','=',$code],
-            ['screen','=',$screen],
-            ['userid','=',$userid]
+        $where = [
+            ['email', '=', $email],
+            ['code', '=', $code],
+            ['screen', '=', $screen],
+            ['userid', '=', $userid]
         ];
         $emailCode = DB::table('email_code')->where($where)->orderByDesc('id')->first();
         $flag = true;
+
         if (!empty($emailCode)) {
-            if ($emailCode['status'] == 1) {
+
+            if ($emailCode->status == 1) {
                 $this->error = '该验证码已失效，请重新获取！';
                 $flag = false;
             }
-            if ($emailCode['create_at'] <= $expire_time) {
+            if ($emailCode->create_at <= $expire_time) {
                 $this->error = '该验证码已超时，请重新获取！';
                 $flag = false;
             }
-            DB::table('email_code')->where('id', $emailCode['id'])->update(['status' => 1]);
+            DB::table('email_code')->where('id',$emailCode->id)->update(['status' => 1]);
         } else {
             $this->error = '验证码错误！';
             $flag = false;
@@ -140,10 +142,10 @@ class Email
             $plog['email'] = $email;
             $plog['code'] = $code;
             $plog['screen'] = $screen;
-            $plog['type'] = 1;
+            $plog['type'] = 0;
             $plog['userid'] = $userid;
             $plog['ctime'] = time();
-            DB::table('email_code')->insert($plog);
+            DB::table('verify_email_error_log')->insert($plog);
         } else {
             return true;
         }
