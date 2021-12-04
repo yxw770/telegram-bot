@@ -106,7 +106,6 @@ class TgOPStepService extends BaseService implements TgOPStepContract
         } else {
             if ($expired_at > 0) {
                 $tgMsgStep->expired_at = time() + $expired_at;
-
             }
             $tgMsgStep->step = $step;
             $tgMsgStep->save();

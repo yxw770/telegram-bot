@@ -76,7 +76,7 @@ function dateTimeChangeByZone($dateTime, $fromZone, $toZone, $format = 'Y-m-d H:
  *
  * @return string json数据
  */
-function J($code, $msg = '', $data = [], $url = null)
+function J($code, $msg = '', $data = [], $url = null,$status=200)
 {
     $return = [
         'code' => $code,
@@ -85,7 +85,10 @@ function J($code, $msg = '', $data = [], $url = null)
         'url' => $url,
         'timestamp' => time(),
     ];
-    return response()->json($return)->setEncodingOptions(JSON_UNESCAPED_UNICODE);
+
+    return response()
+        ->json($return,$status)
+        ->setEncodingOptions(JSON_UNESCAPED_UNICODE);
 }
 
 
