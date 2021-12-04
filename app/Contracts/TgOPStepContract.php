@@ -52,4 +52,14 @@ interface TgOPStepContract
      * @return bool
      */
     public function setStep(int $tg_userid, int $type, int $bot_id, int $expired_at = 5 * 60, int $step = 0):array;
+
+    /**
+     * 退出全部步骤
+     *
+     * @param int $tg_userid
+     * @param int $bot_id
+     * @param int $type
+     * @return mixed
+     */
+    public function exitStep(int $tg_userid,int $bot_id,int $type=-1):int;
 }

@@ -114,8 +114,27 @@ class TgOPStepService extends BaseService implements TgOPStepContract
         }
     }
 
+    /**
+     * 退出全部步骤
+     *
+     * @param int $tg_userid
+     * @param int $bot_id
+     * @param int $type
+     * @return mixed
+     */
+    public function exitStep(int $tg_userid, int $bot_id, int $type = -1): int
+    {
+        // TODO: Implement exitStep() method.
+        $condition = [
+            ['tg_userid', '=', $tg_userid],
+            ['bot_id', '=', $bot_id],
+            ['is_del', '=', 0],
 
+        ];
+        if ($type!=-1){
+            array_push($condition,['type', '=', $type]);
+        }
+        return TgMsgStep::where($condition)->update(['is_del' => 1]);
 
-
-
+    }
 }

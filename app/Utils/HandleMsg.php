@@ -196,10 +196,8 @@ class HandleMsg
                             self::sendMessageOfTg($msgData);
                             return J(200, $msgData['msg']);
                         }
-
                         if (empty($msg['text'])) {
                             //不带则设置为注册模式步骤1，等待对方发送邮箱号
-
                             /********* 设置步骤模式 注册模式 第一步添加邮箱  *******/
                             $res = $tgOPStep->isExist($tgUserid, 1, $botId, 0);
                             if (!$res['status']) {
@@ -248,6 +246,17 @@ class HandleMsg
 
                         return '你好，我是PHP程序！';
                         break;
+                    case '/exit':
+                        //退出当前步骤
+                        $res = $tgOPStep->exitStep($tgUserid,$botId);
+                        if($res >0){
+                            $msgData['msg'] = "已关闭所有操作。";
+
+                        }else{
+                            $msgData['msg'] = "您没有可以关闭的操作。";
+                        }
+                        self::sendMessageOfTg($msgData);
+                        return J(200, $msgData['msg']);
                 }
                 return;
             default:
