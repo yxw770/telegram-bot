@@ -14,4 +14,6 @@ class VipGroup extends Model
     ];
 //    protected $fillable = ['command_list', 'name','is_del'];
     use HasFactory;
+
+
 }

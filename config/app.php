@@ -176,6 +176,7 @@ return [
         App\Providers\RouteServiceProvider::class,
         App\Providers\TgOPStepProvider::class,
         App\Providers\UserOPProvider::class,
+        App\Providers\ServerChanProvider::class,
     ],
 
     /*

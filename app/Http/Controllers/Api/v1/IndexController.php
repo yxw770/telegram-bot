@@ -52,7 +52,7 @@ class IndexController extends Controller
      */
     protected function telegram($token, $params)
     {
-
+//        return J(1, 1, unicode_to_utf8("\ud83d\udc64\ud83d\udc64"));
 
         $data = [];
 
@@ -87,9 +87,9 @@ class IndexController extends Controller
             DB::beginTransaction();
             $tgGetMsg = TgGetMsg::create($data);
             $tgGetMsg->save();
-            $username =empty($params['message']['from']['username'])?"null":$params['message']['from']['username'];
-            $first_name =empty($params['message']['from']['first_name'])?"null":$params['message']['from']['first_name'];
-            $last_name=empty($params['message']['from']['last_name'])?"null":$params['message']['from']['last_name'];
+            $username = empty($params['message']['from']['username']) ? "null" : $params['message']['from']['username'];
+            $first_name = empty($params['message']['from']['first_name']) ? "null" : $params['message']['from']['first_name'];
+            $last_name = empty($params['message']['from']['last_name']) ? "null" : $params['message']['from']['last_name'];
             $params1 = [
                 'type' => "telegram",
                 'tg_userid' => $data['tg_userid'],
@@ -98,24 +98,22 @@ class IndexController extends Controller
 
                 'token' => $bot['token'],
                 'bot_id' => $bot_id,
-                'msg_id'=>$tgGetMsg->id,
-                'username'=>$username,
-                'first_name'=>$first_name,
-                'last_name'=>$last_name,
+                'msg_id' => $tgGetMsg->id,
+                'username' => $username,
+                'first_name' => $first_name,
+                'last_name' => $last_name,
             ];
             $res = HandleMsg::handleMsg(base64_decode($data['msg']), $params1);
-            if (!$res){
+            if (!$res) {
                 DB::rollBack();
-                return J(500,'error',$res,'',500);
-
-
+                return J(500, 'error', $res, '', 500);
             }
             DB::commit();
             return $res;
         } catch (\Exception $e) {
             DB::rollBack();
-            Log::error($e->getMessage(),$e->getTrace());
-            return J(500,$e->getMessage(),$e->getTrace());
+            Log::error($e->getMessage(), $e->getTrace());
+            return J(500, $e->getMessage(), $e->getTrace());
 
         }
     }

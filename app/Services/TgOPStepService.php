@@ -26,10 +26,10 @@ class TgOPStepService extends BaseService implements TgOPStepContract
      * @param int $bot_id 机器人id
      * @param int $expired_at 过期时间多久过期，秒
      * @param int $step 第几步
-     *
+     * @param array $params 附加参数
      * @return bool
      */
-    public function add(int $tg_userid, int $get_msg_id, int $type, int $bot_id, int $expired_at = 5 * 60, int $step = 0): bool
+    public function add(int $tg_userid, int $get_msg_id, int $type, int $bot_id, int $expired_at = 5 * 60, int $step = 0, array $params = []): bool
     {
         // TODO: Implement add() method.
 
@@ -41,6 +41,7 @@ class TgOPStepService extends BaseService implements TgOPStepContract
         $tgMsgStep->create_at = time();
         $tgMsgStep->expired_at = $tgMsgStep->create_at + $expired_at;
         $tgMsgStep->bot_id = $bot_id;
+        $tgMsgStep->params = $params;
         $tgMsgStep->is_del = 0;
         return $tgMsgStep->save();
 
@@ -53,10 +54,10 @@ class TgOPStepService extends BaseService implements TgOPStepContract
      * @param int $type 步骤类型
      * @param int $bot_id 机器人id
      * @param int $expired_time 过期时间多久过期，秒,为0则不变
-     * @param int $step         步数条件
+     * @param int $step 步数条件
      * @return mixed
      */
-    public function isExist(int $tg_userid, int $type, int $bot_id, int $expired_time = 0,int $step =-1): array
+    public function isExist(int $tg_userid, int $type, int $bot_id, int $expired_time = 0, int $step = -1): array
     {
         // TODO: Implement isExist() method.
         $condition = [
@@ -67,7 +68,8 @@ class TgOPStepService extends BaseService implements TgOPStepContract
         ];
         if ($type != 0) {
             array_push($condition, ['type', '=', $type]);
-        }if ($step != -1) {
+        }
+        if ($step != -1) {
             array_push($condition, ['step', '=', $step]);
         }
         $tgMsgStep = TgMsgStep::where($condition)->orderByDesc("id")->first();
@@ -91,9 +93,10 @@ class TgOPStepService extends BaseService implements TgOPStepContract
      * @param int $bot_id 机器人id
      * @param int|float $expired_at 过期时间多久过期，秒,为0则不变
      * @param int $step 步骤
+     * @param mixed $params 附加参数
      * @return bool
      */
-    public function setStep(int $tg_userid, int $type, int $bot_id, int $expired_at = 5 * 60, int $step = 0): array
+    public function setStep(int $tg_userid, int $type, int $bot_id, int $expired_at = 5 * 60, int $step = 0, $params = false): array
     {
         // TODO: Implement setStep() method.
         $condition = [
@@ -110,6 +113,9 @@ class TgOPStepService extends BaseService implements TgOPStepContract
             if ($expired_at > 0) {
                 $tgMsgStep->expired_at = time() + $expired_at;
             }
+            if ($params != false) {
+                $tgMsgStep->params = $params;
+            }
             $tgMsgStep->step = $step;
             $tgMsgStep->save();
             return $this->ret(1, 'ok', $tgMsgStep);
@@ -120,9 +126,9 @@ class TgOPStepService extends BaseService implements TgOPStepContract
     /**
      * 退出全部步骤
      *
-     * @param int $tg_userid    telegram上的用户id
-     * @param int $bot_id       机器人id
-     * @param int $type         步骤类型 -1代表所有
+     * @param int $tg_userid telegram上的用户id
+     * @param int $bot_id 机器人id
+     * @param int $type 步骤类型 -1代表所有
      * @return mixed
      */
     public function exitStep(int $tg_userid, int $bot_id, int $type = -1): int
@@ -134,8 +140,8 @@ class TgOPStepService extends BaseService implements TgOPStepContract
             ['is_del', '=', 0],
 
         ];
-        if ($type!=-1){
-            array_push($condition,['type', '=', $type]);
+        if ($type != -1) {
+            array_push($condition, ['type', '=', $type]);
         }
         return TgMsgStep::where($condition)->update(['is_del' => 1]);
 

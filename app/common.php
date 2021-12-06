@@ -179,3 +179,16 @@ function sysconf(string $name, $value = null)
 
     return isset($config[$name]) ? $config[$name] : '';
 }
+
+/**
+ * Unicode字符转换成utf8字符
+ * @param [type] $unicode_str Unicode字符
+ * @return [type]       Utf-8字符
+ */
+
+function unicodeDecode($unicode_str){
+    $json = '{"str":"'.$unicode_str.'"}';
+    $arr = json_decode($json,true);
+    if(empty($arr)) return '';
+    return $arr['str'];
+}

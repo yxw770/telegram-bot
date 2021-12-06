@@ -17,6 +17,7 @@ use App\Models\TgUser;
 use App\Models\User;
 use App\Models\UserInfos;
 use App\Models\VipGroup;
+use App\Services\ServerChanService;
 use App\Services\TgOPStepService;
 use App\Services\UserOPService;
 use Illuminate\Database\Eloquent\Model;
@@ -39,16 +40,6 @@ use Telegram\Bot\Exceptions\TelegramSDKException;
  */
 class HandleMsg
 {
-    /**
-     * 指令规则数组
-     * @var string[]
-     */
-    protected static $rules = [
-        'reg',//注册用户
-        'exit',//退出步骤
-        'resetEmail',//重置邮箱
-        'resend',//重发邮件
-    ];
 
     /**
      * 消息类型
@@ -130,6 +121,7 @@ class HandleMsg
                     //存在数据，找出步骤进行下一步操作
 
                     switch ($data['type']) {
+                        //注册模式
                         case 1:
                             //注册
                             //校验是否为邮箱
@@ -162,7 +154,7 @@ class HandleMsg
                                         if ($user->state == 0) {
                                             $user->state = 1;
                                             $user->save();
-                                            $userInfos->vip_group = sysconf("tg_defualt_vip_group_id");
+                                            $userInfos->vip_group = sysconf("tg_default_vip_group_id");
                                             $userInfos->save();
                                             $msgData['msg'] = "验证成功，欢迎您的加入";
                                             self::sendMessageOfTg($msgData);
@@ -183,6 +175,39 @@ class HandleMsg
 
                             }
 
+                        //换绑模式
+                        case 2:
+                            if ($data['step'] == 1) {
+                                if (strlen($msg) == 6 && (int)($msg) >= 100000) {
+                                    //第二步，验证邮件验证码是否正确
+                                    /**********  读取用户id   **********/
+                                    if ($userData['status'] == 0) {
+                                        $msgData['msg'] = "用户信息获取错误，请重新输入”/reg“指令重新注册";
+                                        self::sendMessageOfTg($msgData);
+                                        return J(200, $msgData['msg']);
+                                    }
+                                    $userData = $userData['data'];
+                                    $email = $data['params']['email'];
+                                    $emailHelper = new Email();
+                                    if ($emailHelper->verifyCode($email, $msg, 'resetcode', $userData->id)) {
+                                        $tgOPStep->setStep($tgUserid, 2, $botId, 0, 2);
+                                        $user = User::find($userData->id);
+                                        $user->email = $email;
+                                        $user->save();
+                                        $msgData['msg'] = "换绑成功，新绑定的邮箱为：" . $email;
+                                        self::sendMessageOfTg($msgData);
+                                        return J(200, $msgData['msg']);
+                                    }
+                                    $msgData['msg'] = "验证失败，原因：" . $emailHelper->getError();
+                                    self::sendMessageOfTg($msgData);
+                                    return J(200, $msgData['msg']);
+
+                                }
+                                $msgData['msg'] = "验证码长度不正确或格式错误";
+                                self::sendMessageOfTg($msgData);
+                                return J(200, $msgData['msg']);
+
+                            }
 
                         default:
                             //未知
@@ -291,16 +316,105 @@ class HandleMsg
                     //重发邮件
                     case '/resend':
                         //重新发送邮件
-                        $res = $tgOPStep->isExist($tgUserid, 1, $botId, 0, 1);
-                        if (!$res['status']) {
-                            //不在注册步骤内
-                            $msgData['msg'] = "未知指令";
+                        if (!($userData['status'] == 1 && $userData['data']->state > 0)) {
+                            //未注册，发送注册验证码
+                            $res = $tgOPStep->isExist($tgUserid, 1, $botId, 0, 1);
+                            if (!$res['status']) {
+                                //不在注册步骤内
+                                $msgData['msg'] = "未知指令";
+                                self::sendMessageOfTg($msgData);
+                                return J(200, $msgData['msg']);
+                            }
+                            $email = $userData['data']->email;
+                            return self::tgRegSendEmail($email, $userData, $params, $msgData);
+                        } else {
+                            //已注册发送换绑验证码
+                            $res = $tgOPStep->isExist($tgUserid, 2, $botId, 0, 1);
+                            if (!$res['status']) {
+                                //不在换绑步骤内
+                                $msgData['msg'] = "未知指令";
+                                self::sendMessageOfTg($msgData);
+                                return J(200, $msgData['msg']);
+                            }
+                            $email = $userData['data']->email;
+                            return self::tgResetSendEmail($res['data']['params']['email'], $userData, $params, $msgData);
+                        }
+
+
+                    //用户信息
+                    case "/getme":
+                        $data = $userData['data'];
+                        $group = UserInfos::where("userid", $userid)->first();
+
+                        if (is_null($group)) {
+                            $vip = "未知组别";
+                        }
+                        if ($group->vip_expire_at == -1 || $group->vip_expire_at > time()) {
+                            $group_id = $group->vip_group;
+                        } else {
+                            $group_id = sysconf("tg_default_vip_group_id");
+                        }
+                        $vip_group = VipGroup::where("id", $group_id)->where("is_del", 0)->first();
+                        if (empty($vip_group)) {
+                            $vip = "未知组别";
+                        } else {
+                            $vip = $vip_group->name;
+                        }
+                        $ex_time = $group->vip_expire_at == -1 ? '永不到期' : date("Y-m-d H:i:s", $group->vip_expire_at);
+                        $msgData['msg'] = unicodeDecode("\ud83d\udc64 ") . "用户编号：" . $data->id . "\n" . unicodeDecode("\ud83d\udce8") . ' 邮箱号： ' . $data->email .
+                            "\n" . unicodeDecode("\ud83d\udc51") . " VIP组别：$vip" . "\n" . unicodeDecode("\ud83d\udd58") . " VIP到期时间：" . $ex_time;
+                        self::sendMessageOfTg($msgData);
+                        return J(200, $msgData['msg']);
+
+                    //绑定server酱sendKey
+                    case "/bindServerChan":
+                        if (empty($msg['text'])) {
+                            $msgData['msg'] = "格式有误，请输入“/bindServerChan 您的SendKey”\n例如：/bindServerChan SCT100421T8tGLeWnDF6ZwMF2BRCr8DbEZ";
                             self::sendMessageOfTg($msgData);
                             return J(200, $msgData['msg']);
                         }
-                        $email = $userData['data']->email;
-                        return self::tgRegSendEmail($email, $userData, $params, $msgData);
+                        $serverChan = new ServerChanService();
+                        if ($serverChan->setSendKey($userData['data']->id, $msg['text'])) {
+                            $msgData['msg'] = "Server酱SendKey绑定成功！";
+                            self::sendMessageOfTg($msgData);
+                            return J(200, $msgData['msg']);
+                        } else {
+                            $msgData['msg'] = "Server酱SendKey绑定失败，请联系技术人员处理";
+                            self::sendMessageOfTg($msgData);
+                            return J(200, $msgData['msg']);
+                        }
 
+                    //换绑邮箱
+                    case "/resetEmail":
+                        if (!($userData['status'] == 1 && $userData['data']->state > 0)) {
+                            $msgData['msg'] = "您账户还未注册，如需注册请输入“/reg”";
+                            self::sendMessageOfTg($msgData);
+                            return J(200, $msgData['msg']);
+                        }
+                        if (!empty($msg['text'])) {
+                            //含有邮箱注册条件
+                            $res = $tgOPStep->isExist($tgUserid, 2, $botId, 0);
+                            if ($res['status'] != 0) {
+                                switch ($res['data']['step']) {
+                                    case 1:
+                                        //输入验证码
+                                        $msgData['msg'] = "您输入验证码不正确，请重新输入，退出换绑邮箱模式请输入：“/exit”";
+                                        self::sendMessageOfTg($msgData);
+                                        return J(200, $msgData['msg']);
+                                    default:
+                                        $msgData['msg'] = "您已完成换绑操作，请勿重复操作";
+                                        self::sendMessageOfTg($msgData);
+                                        return J(200, $msgData['msg']);
+                                }
+
+                            }
+                            return self::tgResetSendEmail($msg['text'], $userData, $params, $msgData);
+
+                        } else {
+                            $msgData['msg'] = "格式有误，请输入“/resetEmail 您要换绑的email”\n例如：/resetEmail xxx@gmail.com";
+                            self::sendMessageOfTg($msgData);
+                            return J(200, $msgData['msg']);
+                        }
                 }
                 return true;
             default:
@@ -331,20 +445,24 @@ class HandleMsg
         if ($userid != 0) {
             //已创建用户
             /**************  读取用户会员组 start  **************/
-            $group_id = UserInfos::where("userid", $userid)->value("vip_group");
+            $group = UserInfos::where("userid", $userid)->first();
 
-            if (is_null($group_id)) {
+            if (is_null($group)) {
                 return [
                     'status' => 0,
                     'msg' => '用户会员分组异常，请联系技术处理，用户ID：' . $userid,
                 ];
             }
-
+            if ($group->vip_expire_at == -1 || $group->vip_expire_at > time()) {
+                $group_id = $group->vip_group;
+            } else {
+                $group_id = sysconf("tg_default_vip_group_id");
+            }
             $vip_group = VipGroup::where("id", $group_id)->where("is_del", 0)->first();
             if (empty($vip_group)) {
                 return [
                     'status' => 0,
-                    'msg' => 'VIP分组不存在，请联系技术处理，用户ID.' . $userid,
+                    'msg' => 'VIP分组不存在，请联系技术处理，用户ID:' . $userid,
                 ];
             }
             $commandList = $vip_group->command_list;
@@ -458,7 +576,8 @@ class HandleMsg
             /************  校验用户是否已加入会员系统  end  ************/
 
             /***************  发送注册验证码邮件 start ***************/
-            $msgData['msg'] = "验证码已发送，请在5分钟内，回复邮件内的验证码，2分钟内未收到邮件，请回复“/resend”指令重发邮件，请注意您的垃圾邮件内是否存在验证码邮件！";
+
+            $msgData['msg'] = "验证码已加入发送队列，请稍等。如1分钟内未提示发送成功请重新注册。";
             self::sendMessageOfTg($msgData);
             $emailHelper = new Email();
             $res = $emailHelper->sendCode($email, $userid, 'regcode');
@@ -468,6 +587,8 @@ class HandleMsg
                 if ($tgOPStep->setStep($tgUserid, 1, $botId, 5 * 60, 1)['status'] == 0) {
                     $tgOPStep->add($tgUserid, $params['msg_id'], 1, $botId, 5 * 60, 1);
                 }
+                $msgData['msg'] = "验证码发送成功，请在5分钟内，回复邮件内的验证码，2分钟内未收到邮件，请回复“/resend”指令重发邮件，请注意您的垃圾邮件内是否存在验证码邮件！";
+                self::sendMessageOfTg($msgData);
                 return J(200, '已发送验证码到你的邮箱，请注意查收', 60);
             } else {
                 $msgData['msg'] = "验证码发送失败，原因：" . $emailHelper->getError();
@@ -480,6 +601,65 @@ class HandleMsg
             self::sendMessageOfTg($msgData);
             return J(200, $msgData['msg']);
         }
+    }
+
+    /**
+     * @Name telegram换绑邮件发送
+     * @Author Godfrey<yxw770@gmail.com>
+     * @Date 2021-12-06 15:32
+     * @Param $email    邮箱号
+     * @param $userData 用户信息
+     * @param $params   传入参数
+     * @param $msgData  发送消息基本参数
+     * @Return mixed
+     **/
+    protected static function tgResetSendEmail($email, $userData, $params, $msgData)
+    {
+
+        $botId = $params['bot_id'];
+        $tgUserid = $params['tg_userid'];
+        if (is_email($email)) {
+
+            $userData = $userData['data'];
+
+            $user = User::find($userData->id);
+
+            if ($userData->state != 1) {
+                $msgData['msg'] = "您账户状态无法进行换绑做错";
+                self::sendMessageOfTg($msgData);
+                return J(200, $msgData['msg']);
+            }
+
+            if ($userData->email == $email) {
+                $msgData['msg'] = "您的换绑的邮箱与已绑邮箱相同！";
+                self::sendMessageOfTg($msgData);
+                return J(200, $msgData['msg']);
+            }
+            $userid = $user->id;
+            $msgData['msg'] = "验证码已加入发送队列，请稍等。如1分钟内未提示发送成功请重新绑定。";
+            self::sendMessageOfTg($msgData);
+            $emailHelper = new Email();
+            $res = $emailHelper->sendCode($email, $userid, 'resetcode');
+            if ($res) {
+                //设置步数
+                $tgOPStep = new TgOPStepService();
+                if ($tgOPStep->setStep($tgUserid, 2, $botId, 5 * 60, 1)['status'] == 0) {
+                    $tgOPStep->add($tgUserid, $params['msg_id'], 2, $botId, 5 * 60, 1,['email'=>$email]);
+                }
+                $msgData['msg'] = "验证码发送成功，请在5分钟内，回复邮件内的验证码，2分钟内未收到邮件，请回复“/resend”指令重发邮件，请注意您的垃圾邮件内是否存在验证码邮件！";
+                self::sendMessageOfTg($msgData);
+                return J(200, '已发送验证码到你的邮箱，请注意查收', 60);
+            } else {
+                $msgData['msg'] = "验证码发送失败，原因：" . $emailHelper->getError();
+                self::sendMessageOfTg($msgData);
+                return J(500, $emailHelper->getError());
+            }
+        }else{
+            $msgData['msg'] = "邮箱格式不正确！";
+            self::sendMessageOfTg($msgData);
+            return J(200, $msgData['msg']);
+        }
+
     }
 
     /**
