@@ -310,7 +310,7 @@ class HandleMsg
 
 
     /***
-     * @Name 指令权限认证
+     * @Name 指令权限 认证
      * @Author Godfrey<yxw770@gmail.com>
      * @Date 2021-12-06 12:01
      * @Param int $userid 用户ID
