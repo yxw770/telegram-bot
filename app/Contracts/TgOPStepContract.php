@@ -38,9 +38,10 @@ interface TgOPStepContract
      * @param int $type                 步骤类型
      * @param int $bot_id               机器人id
      * @param int $expired_time         过期时间多久过期，秒,为0则不变
+     * @param int $step
      * @return mixed
      */
-    public function isExist(int $tg_userid, int $type, int $bot_id, int $expired_time = 0): array;
+    public function isExist(int $tg_userid, int $type, int $bot_id, int $expired_time = 0,int $step): array;
 
     /**
      * 更改步数

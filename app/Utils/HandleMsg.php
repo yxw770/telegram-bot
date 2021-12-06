@@ -155,11 +155,11 @@ class HandleMsg
                                     if ($emailHelper->verifyCode($email, $msg, 'regcode', $userData->id)) {
                                         $tgOPStep->setStep($tgUserid, 1, $botId, 5 * 60, 2);
                                         $user = User::find($userData->id);
-                                        $userInfos = UserInfos::where("userid", $user->id)->find();
+                                        $userInfos = UserInfos::where("userid", $user->id)->first();
                                         if ($user->state == 0) {
                                             $user->state = 1;
                                             $user->save();
-                                            $userInfos->vip_group=sysconf("tg_defualt_vip_group_id");
+                                            $userInfos->vip_group = sysconf("tg_defualt_vip_group_id");
                                             $userInfos->save();
                                             $msgData['msg'] = "验证成功，欢迎您的加入";
                                             self::sendMessageOfTg($msgData);
@@ -288,7 +288,15 @@ class HandleMsg
                     //重发邮件
                     case '/resend':
                         //重新发送邮件
-
+                        $res = $tgOPStep->isExist($tgUserid, 1, $botId, 0, 1);
+                        if (!$res['status']) {
+                            //不在注册步骤内
+                            $msgData['msg'] = "未知指令";
+                            self::sendMessageOfTg($msgData);
+                            return J(200, $msgData['msg']);
+                        }
+                        $email = $userData['data']->email;
+                        return self::tgRegSendEmail($email, $userData, $params);
 
                 }
                 return true;

@@ -53,9 +53,10 @@ class TgOPStepService extends BaseService implements TgOPStepContract
      * @param int $type 步骤类型
      * @param int $bot_id 机器人id
      * @param int $expired_time 过期时间多久过期，秒,为0则不变
+     * @param int $step         步数条件
      * @return mixed
      */
-    public function isExist(int $tg_userid, int $type, int $bot_id, int $expired_time = 0): array
+    public function isExist(int $tg_userid, int $type, int $bot_id, int $expired_time = 0,int $step =-1): array
     {
         // TODO: Implement isExist() method.
         $condition = [
@@ -66,6 +67,8 @@ class TgOPStepService extends BaseService implements TgOPStepContract
         ];
         if ($type != 0) {
             array_push($condition, ['type', '=', $type]);
+        }if ($step != -1) {
+            array_push($condition, ['step', '=', $step]);
         }
         $tgMsgStep = TgMsgStep::where($condition)->orderByDesc("id")->first();
         if (empty($tgMsgStep)) {

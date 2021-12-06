@@ -51,9 +51,10 @@ class Email
             ['screen', '=', $screen],
             ['userid', '=', $userid]
         ];
-        $email_code = EmailCode::where($where)->first();
-        if (!empty($email_code)) {
-            $this->error = '您的操作太频繁，请稍后再试！再次发送时间还剩：' . ((int)($email_code->create_at) + (int)($this->expire_in) - time()) . "秒";
+        $email_code = EmailCode::where($where)->orderByDesc("id")->first();
+        $intervals = (int)($email_code->create_at) + (int)(sysconf("email_intervals_time")) * 60 - time();
+        if ($intervals > 0) {
+            $this->error = '您的操作太频繁，请稍后再试！再次发送时间还剩：' . $intervals . "秒";
             return false;
         }
         if (!$this->emailCheckError($email)) {
@@ -68,7 +69,7 @@ class Email
             'zhTime' => date("Y-m-d H:i:s", $time + 5 * 60),
             'enTime' => dateTimeChangeByZone(date("m/d/Y H:i:s", $time + 5 * 60), 'Asia/Shanghai', 'UTC', 'm/d/Y H:i:s')
         ];
-        Mail::send('mail.'.$screen, $data, function ($message) use ($screen, $email) {
+        Mail::send('mail.' . $screen, $data, function ($message) use ($screen, $email) {
             switch ($screen) {
                 case 'regcode':
                     $subject = "注册验证码-Register verification Code";
@@ -84,6 +85,12 @@ class Email
             $this->error = '验证码发送失败！';
             return false;
         }
+        $where = [
+            ['email', '=', $email],
+            ['screen', '=', $screen],
+            ['userid', '=', $userid]
+        ];
+         EmailCode::where($where)->update(['status'=>1]);
         $emailCode = new EmailCode;
         $emailCode->userid = $userid;
         $emailCode->email = $email;
@@ -133,7 +140,7 @@ class Email
                 $this->error = '该验证码已超时，请重新获取！';
                 $flag = false;
             }
-            DB::table('email_code')->where('id',$emailCode->id)->update(['status' => 1]);
+            DB::table('email_code')->where('id', $emailCode->id)->update(['status' => 1]);
         } else {
             $this->error = '验证码错误！';
             $flag = false;
