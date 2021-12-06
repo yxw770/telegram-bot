@@ -11,9 +11,11 @@
 namespace App\Utils;
 
 use App\Contracts\TgOPStepContract;
+use App\Models\BotCommand;
 use App\Models\TgUser;
 use App\Models\User;
 use App\Models\UserInfos;
+use App\Models\VipGroup;
 use App\Services\TgOPStepService;
 use App\Services\UserOPService;
 use Illuminate\Database\Eloquent\Model;
@@ -46,6 +48,7 @@ class HandleMsg
         'resetEmail',//重置邮箱
         'resend',//重发邮件
     ];
+
     /**
      * 消息类型
      * 种类：0.未知 1.普通消息 2.指令类型 3.其他
@@ -61,13 +64,12 @@ class HandleMsg
      */
     public static function handleMsg($msg, $params)
     {
-
         //去除右边空格
         $msg = (string)Str::of($msg)->rtrim();
 
         /***************  正则匹配命令 start  ***************/
         //返回命令表达式
-        $pattern = self::regexCommand();
+        $pattern = "/^(\/[A-Za-z0-9]{1,20})$|^(\/[A-Za-z0-9]{1,20}) (.*)/";
         preg_match_all($pattern,
             $msg,
             $res, PREG_PATTERN_ORDER);
@@ -89,6 +91,7 @@ class HandleMsg
             case 'telegram':
                 $user = new UserOPService();
                 $userData = $user->getUserByTg($params['tg_userid'], $params['bot_id']);
+
                 return self::telegram($msg, $params, $userData);
             default:
                 return false;
@@ -103,13 +106,15 @@ class HandleMsg
      */
     protected static function telegram($msg, $params, $userData)
     {
-        $tgOPStep = new TgOPStepService();
         $msgData = [
             'token' => $params['token'],
             'chat_id' => $params['tg_userid'],
             'msg' => '',
             'message_id' => $params['message_id'],
         ];
+
+        $tgOPStep = new TgOPStepService();
+
         switch (self::$msgType) {
             case 1:
                 //普通消息
@@ -127,6 +132,7 @@ class HandleMsg
                             //校验是否为邮箱
                             if ($data['step'] == 0) {
                                 //第一步，发送邮件
+//                                return true;
                                 return self::tgRegSendEmail($msg, $userData, $params);
                             } elseif ($data['step'] == 1) {
 
@@ -149,9 +155,12 @@ class HandleMsg
                                     if ($emailHelper->verifyCode($email, $msg, 'regcode', $userData->id)) {
                                         $tgOPStep->setStep($tgUserid, 1, $botId, 5 * 60, 2);
                                         $user = User::find($userData->id);
+                                        $userInfos = UserInfos::where("userid", $user->id)->find();
                                         if ($user->state == 0) {
                                             $user->state = 1;
                                             $user->save();
+                                            $userInfos->vip_group=sysconf("tg_defualt_vip_group_id");
+                                            $userInfos->save();
                                             $msgData['msg'] = "验证成功，欢迎您的加入";
                                             self::sendMessageOfTg($msgData);
                                             return J(200, $msgData['msg']);
@@ -174,7 +183,7 @@ class HandleMsg
 
                         default:
                             //未知
-                            return false;
+//                            return true;
                     }
                 }
                 $msgData['msg'] = "普通消息";
@@ -182,11 +191,27 @@ class HandleMsg
                 return J(200, $msgData['msg']);
 
             case 2:
+                /***********  校验用户权限  start  ***********/
+                $userid = $userData['status'] == 1 ? ($userData['data']->state == 1 ? $userData['data']->id : 0) : 0;
+                if ($userData['data']->state == 2) {
+                    //用户冻结，无法操作任何东西
+                    $msgData['msg'] = "您账户已被冻结，请联系客服处理。";
+                    self::sendMessageOfTg($msgData);
+                    return J(200, $msgData['msg']);
+                }
+                $res = self::commandAuthCheck($userid, $msg['commend']);
+                if ($res['status'] != 1) {
+                    $msgData['msg'] = $res['msg'];
+                    self::sendMessageOfTg($msgData);
+                    return J(200, $msgData['msg']);
+                }
+                /***********  校验用户权限   end   ***********/
                 //指令消息
                 $botId = $params['bot_id'];
                 $tgUserid = $params['tg_userid'];
 
                 switch ($msg['commend']) {
+                    //注册
                     case '/reg':
                         //注册用户
                         //是否带邮箱
@@ -246,44 +271,96 @@ class HandleMsg
 
                         return '你好，我是PHP程序！';
                         break;
+
+                    //关闭所有步骤
                     case '/exit':
                         //退出当前步骤
-                        $res = $tgOPStep->exitStep($tgUserid,$botId);
-                        if($res >0){
+                        $res = $tgOPStep->exitStep($tgUserid, $botId);
+                        if ($res > 0) {
                             $msgData['msg'] = "已关闭所有操作。";
 
-                        }else{
+                        } else {
                             $msgData['msg'] = "您没有可以关闭的操作。";
                         }
                         self::sendMessageOfTg($msgData);
                         return J(200, $msgData['msg']);
+
+                    //重发邮件
+                    case '/resend':
+                        //重新发送邮件
+
+
                 }
-                return;
+                return true;
             default:
-                return false;
+                return true;
         }
     }
 
 
-    /**
-     * 指令消息正则替换
-     *
-     * @param $rules
-     * @return string
-     */
-    protected static function regexCommand()
+    /***
+     * @Name 指令权限认证
+     * @Author Godfrey<yxw770@gmail.com>
+     * @Date 2021-12-06 12:01
+     * @Param int $userid 用户ID
+     * @param string $command 指令
+     * @Return array
+     **/
+    protected static function commandAuthCheck($userid, $command)
     {
-        $exp = "/^(&&**)$|^(&&**) (.*)/";
-        $rule_text = "";
-        foreach (self::$rules as $k => $v) {
-            if ($k == 0) {
-                $rule_text .= "\/" . $v;
 
-            } else {
-                $rule_text .= "|\/" . $v;
-            }
+        $commands = BotCommand::where("command", $command)->first();
+        if (empty($commands)) {
+            //指令不存在
+            return [
+                'status' => 0,
+                'msg' => '未知指令',
+            ];
         }
-        return Str::replaceArray('&&**', [$rule_text, $rule_text], $exp);
+        if ($userid != 0) {
+            //已创建用户
+            /**************  读取用户会员组 start  **************/
+            $group_id = UserInfos::where("userid", $userid)->value("vip_group");
+
+            if (is_null($group_id)) {
+                return [
+                    'status' => 0,
+                    'msg' => '用户会员分组异常，请联系技术处理，用户ID：' . $userid,
+                ];
+            }
+
+            $vip_group = VipGroup::where("id", $group_id)->where("is_del", 0)->first();
+            if (empty($vip_group)) {
+                return [
+                    'status' => 0,
+                    'msg' => 'VIP分组不存在，请联系技术处理，用户ID.' . $userid,
+                ];
+            }
+            $commandList = $vip_group->command_list;
+            /**************  读取用户会员组  end   **************/
+
+        } else {
+            //游客模式指令
+            $vip_group = VipGroup::where("id", 0)->where("is_del", 0)->first();
+            if (empty($vip_group)) {
+                return [
+                    'status' => 0,
+                    'msg' => 'VIP分组不存在，请联系技术处理.',
+                ];
+            }
+            $commandList = $vip_group->command_list;
+        }
+        //判断该指令是否在指令集
+        if (in_array($commands->id, $commandList)) {
+            return [
+                'status' => 1,
+            ];
+        } else {
+            return [
+                'status' => 0,
+                'msg' => '您的权限不足，无法使用该指令.',
+            ];
+        }
     }
 
     protected static function tgRegSendEmail($email, $userData, $params)

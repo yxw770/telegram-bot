@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\api\v1;
+namespace App\Http\Controllers\Api\V1;
 
 use App\Exceptions\TelegramSDKException;
 use App\Http\Controllers\Controller;
@@ -11,6 +11,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use App\Models\TgGetMsg;
+use Illuminate\Support\Facades\Mail;
 use Telegram\Bot\Api;
 
 class IndexController extends Controller

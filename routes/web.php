@@ -1,7 +1,7 @@
 <?php
 
 //use App\Http\Controllers\UserController;
-//use App\Http\Controllers\api\v1\;
+//use App\Http\Controllers\Api\v1\;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -18,9 +18,12 @@ use Illuminate\Support\Facades\Route;
 Route::get('/', function () {
     return view('welcome');
 });
-Route::prefix('api/v1')->group(function() {
-    Route::post('notify/{type}/{token}',[\App\Http\Controllers\api\v1\IndexController::class,'notify']);
+Route::prefix('/api/v1')->group(function() {
+    Route::post('notify/{type}/{token}',[\App\Http\Controllers\Api\V1\IndexController::class,'notify']);
 });
-
+Route::prefix('/api/v1/admin')->group(function() {
+    Route::post('command/add',[\App\Http\Controllers\Api\V1\Admin\CommandController::class,'add']);
+    Route::put('vip/update',[\App\Http\Controllers\Api\V1\Admin\VipController::class,'updateGroup']);
+});
 
 

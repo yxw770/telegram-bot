@@ -26,7 +26,7 @@ class Message
 {
 
     /** Telegram Bot API URL. */
-    const BASE_BOT_URL = 'https://api.telegram.org/bot';
+    const BASE_BOT_URL = 'https://Api.telegram.org/bot';
     /**  机器人token. */
     protected $accessToken;
 

@@ -117,9 +117,9 @@ class TgOPStepService extends BaseService implements TgOPStepContract
     /**
      * 退出全部步骤
      *
-     * @param int $tg_userid
-     * @param int $bot_id
-     * @param int $type
+     * @param int $tg_userid    telegram上的用户id
+     * @param int $bot_id       机器人id
+     * @param int $type         步骤类型 -1代表所有
      * @return mixed
      */
     public function exitStep(int $tg_userid, int $bot_id, int $type = -1): int
