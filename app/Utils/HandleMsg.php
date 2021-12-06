@@ -12,6 +12,7 @@ namespace App\Utils;
 
 use App\Contracts\TgOPStepContract;
 use App\Models\BotCommand;
+use App\Models\TgSendMsg;
 use App\Models\TgUser;
 use App\Models\User;
 use App\Models\UserInfos;
@@ -111,6 +112,8 @@ class HandleMsg
             'chat_id' => $params['tg_userid'],
             'msg' => '',
             'message_id' => $params['message_id'],
+            'trigger_msg' => json_encode($msg),
+            'bot_id' => $params['bot_id'],
         ];
 
         $tgOPStep = new TgOPStepService();
@@ -133,7 +136,7 @@ class HandleMsg
                             if ($data['step'] == 0) {
                                 //第一步，发送邮件
 //                                return true;
-                                return self::tgRegSendEmail($msg, $userData, $params);
+                                return self::tgRegSendEmail($msg, $userData, $params, $msgData);
                             } elseif ($data['step'] == 1) {
 
                                 if (strlen($msg) == 6 && (int)($msg) >= 100000) {
@@ -193,7 +196,7 @@ class HandleMsg
             case 2:
                 /***********  校验用户权限  start  ***********/
                 $userid = $userData['status'] == 1 ? ($userData['data']->state == 1 ? $userData['data']->id : 0) : 0;
-                if ($userData['data']->state == 2) {
+                if ($userData['status'] == 1 && $userData['data']->state == 2) {
                     //用户冻结，无法操作任何东西
                     $msgData['msg'] = "您账户已被冻结，请联系客服处理。";
                     self::sendMessageOfTg($msgData);
@@ -265,7 +268,7 @@ class HandleMsg
                                 }
 
                             }
-                            return self::tgRegSendEmail($msg['text'], $userData, $params);
+                            return self::tgRegSendEmail($msg['text'], $userData, $params, $msgData);
 
                         }
 
@@ -296,7 +299,7 @@ class HandleMsg
                             return J(200, $msgData['msg']);
                         }
                         $email = $userData['data']->email;
-                        return self::tgRegSendEmail($email, $userData, $params);
+                        return self::tgRegSendEmail($email, $userData, $params, $msgData);
 
                 }
                 return true;
@@ -371,14 +374,19 @@ class HandleMsg
         }
     }
 
-    protected static function tgRegSendEmail($email, $userData, $params)
+    /**
+     * @Name telegram注册邮件发送
+     * @Author Godfrey<yxw770@gmail.com>
+     * @Date 2021-12-06 15:32
+     * @Param $email    邮箱号
+     * @param $userData 用户信息
+     * @param $params   传入参数
+     * @param $msgData  发送消息基本参数
+     * @Return mixed
+     **/
+    protected static function tgRegSendEmail($email, $userData, $params, $msgData)
     {
-        $msgData = [
-            'token' => $params['token'],
-            'chat_id' => $params['tg_userid'],
-            'msg' => '',
-            'message_id' => $params['message_id'],
-        ];
+
         $botId = $params['bot_id'];
         $tgUserid = $params['tg_userid'];
         if (is_email($email)) {
@@ -459,7 +467,6 @@ class HandleMsg
                 $tgOPStep = new TgOPStepService();
                 if ($tgOPStep->setStep($tgUserid, 1, $botId, 5 * 60, 1)['status'] == 0) {
                     $tgOPStep->add($tgUserid, $params['msg_id'], 1, $botId, 5 * 60, 1);
-
                 }
                 return J(200, '已发送验证码到你的邮箱，请注意查收', 60);
             } else {
@@ -503,7 +510,7 @@ class HandleMsg
     {
 
         $tgBot = new Api($params['token']);
-        $params = [
+        $params1 = [
             'chat_id' => $params['chat_id'],
             'text' => $params['msg'],
             'disable_web_page_preview' => true,
@@ -511,7 +518,16 @@ class HandleMsg
             'reply_to_message_id' => $params['message_id'],
         ];
 
-        $tgBot->sendMessage($params);
+        $tgBot->sendMessage($params1);
+        $data = [
+            'tg_userid' => $params['chat_id'],
+            'send_msg' => $params['msg'],
+            'trigger_msg' => $params['trigger_msg'],
+            'message_id' => $params['message_id'],
+            'create_at' => time(),
+            'bot_id' => $params['bot_id']
+        ];
+        TgSendMsg::insert($data);
 //        dd(123);
     }
 }

@@ -115,7 +115,7 @@ class IndexController extends Controller
         } catch (\Exception $e) {
             DB::rollBack();
             Log::error($e->getMessage(),$e->getTrace());
-            return J(500,$e->getMessage(),$e->getTrace(),'',500);
+            return J(500,$e->getMessage(),$e->getTrace());
 
         }
     }

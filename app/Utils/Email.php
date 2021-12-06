@@ -52,11 +52,14 @@ class Email
             ['userid', '=', $userid]
         ];
         $email_code = EmailCode::where($where)->orderByDesc("id")->first();
-        $intervals = (int)($email_code->create_at) + (int)(sysconf("email_intervals_time")) * 60 - time();
-        if ($intervals > 0) {
-            $this->error = '您的操作太频繁，请稍后再试！再次发送时间还剩：' . $intervals . "秒";
-            return false;
+        if (!empty($email_code)){
+            $intervals = (int)($email_code->create_at) + (int)(sysconf("email_intervals_time")) * 60 - time();
+            if ($intervals > 0) {
+                $this->error = '您的操作太频繁，请稍后再试！再次发送时间还剩：' . $intervals . "秒";
+                return false;
+            }
         }
+
         if (!$this->emailCheckError($email)) {
             return false;
         }
