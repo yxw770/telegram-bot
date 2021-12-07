@@ -239,6 +239,9 @@ class HandleMsg
                 $tgUserid = $params['tg_userid'];
 
                 switch ($msg['commend']) {
+                    //说明书
+                    case '/help':
+
                     //注册
                     case '/reg':
                         //注册用户
